@@ -1,0 +1,191 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(readxl)
+Twin_adoptees <- read_excel("Twin_adoptees.xlsx")
+head(Twin_adoptees)
+
+```
+
+
+```{r}
+library(dplyr)
+
+df <- Twin_adoptees %>%
+  select(-c(Effect_ID, Table_sources, Authors, Title, Year, Source)) %>%
+  mutate(across(-c(Beta, Std_err, N), as.factor)) %>%
+  mutate(across(c(Beta, Std_err, N), as.numeric)) %>%
+  mutate(vi = Std_err^2) %>%
+  select(-Std_err)
+
+head(df)
+
+```
+
+```{r}
+for (col in names(df)) {
+  if (is.factor(df[[col]])) {
+    cat(col, ":")
+    print(levels(df[[col]]))
+    cat("\n")
+  }
+}
+
+```
+
+```{r fig.width=11}
+library(metaforest)
+WeightedScatter(df, yi= "Beta", vi ="vi", vars = c("Study_ID"))
+
+```
+
+
+```{r}
+library(metaforest)
+set.seed(532)
+mf <- MetaForest(formula = Beta ~ .,
+                 data = df,
+                 vi = "vi",
+                 whichweights = "unif",
+                 num.trees = 3000,
+                 method = "DL")
+
+summary(mf)
+
+```
+
+```{r eval=FALSE, include=FALSE}
+features <- preselect(mf, replications = 100, algorithm = "recursive")
+
+```
+
+```{r fig.height=7}
+library(gridExtra)
+
+grid.arrange(plot(mf),VarImpPlot(mf), ncol=1)
+
+```
+
+```{r}
+Model_spec <- read_excel("Model_spec.xlsx")
+head(Model_spec)
+
+```
+
+```{r}
+create_predictions <- function(column, model) {
+  new_df <- df %>%
+    mutate(across(all_of(Model_spec$Var), ~ Model_spec[[column]][match(cur_column(), Model_spec$Var)]))
+  predict(model, data = new_df, type = "response")$predictions
+}
+
+predictions_df <- data.frame(
+  Study_ID = df$Study_ID,
+  Adopt_hat = create_predictions("Adopt", mf),
+  Twin_hat = create_predictions("Twin", mf),
+  Bio_hat = create_predictions("Bio", mf)
+) %>%
+  mutate(nature = (Bio_hat - Adopt_hat) / Twin_hat)
+
+head(predictions_df)
+
+```
+
+```{r}
+
+library(ggplot2)
+
+plot_density_with_mean_mode <- function(nature_data, color) {
+  mean_nature <- mean(nature_data, na.rm = TRUE)
+  mode_nature <- density(nature_data, na.rm = TRUE)$x[which.max(density(nature_data, na.rm = TRUE)$y)]
+  ggplot(data = data.frame(nature = nature_data), aes(x = nature)) +
+    geom_density(fill = color, alpha = 0.5) +
+    geom_vline(xintercept = mean_nature, colour = "grey", linetype = "dashed", size = 1) +
+    geom_vline(xintercept = mode_nature, colour = "lightblue", size = 1) +
+    annotate("text", x = mean_nature, y = 0, label = paste0(round(mean_nature, 3)), vjust = -4) +
+    annotate("text", x = mode_nature, y = 0, label = paste0(round(mode_nature, 3)), vjust = -1) +
+    theme_minimal()  +  labs(title = "", x = "", y = "")
+}
+
+beta_est <- plot_density_with_mean_mode(predictions_df$Twin_hat,"orange")
+```
+
+```{r}
+nature_est <- plot_density_with_mean_mode(predictions_df$nature,"green")
+
+```
+
+```{r fig.height=7}
+library(ggplot2)
+library(dplyr)
+
+mean_data <- predictions_df %>%
+  group_by(Study_ID) %>%
+  summarise(
+    mean_Twin_hat = mean(Twin_hat, na.rm = TRUE),
+    sem_Twin_hat = sd(Twin_hat, na.rm = TRUE) / sqrt(n())
+  )
+
+outlier <- ggplot(mean_data, aes(x = Study_ID, y = mean_Twin_hat)) +
+  geom_bar(stat = "identity", fill = "lightblue", color = "black", width = 0.7) +
+  geom_errorbar(aes(ymin = mean_Twin_hat - sem_Twin_hat, ymax = mean_Twin_hat + sem_Twin_hat), 
+                width = 0.2, color = "black") +
+  labs(title = "", x = "", y = "") +
+  theme_minimal() + coord_flip()
+
+outlier
+```
+
+Sensitivity analysis
+
+```{r}
+df2 <- df %>% filter(!Study_ID %in% c("Behr_2", "Anto_5"))
+set.seed(532)
+mf2 <- MetaForest(formula = Beta ~ .,
+                 data = df2,
+                 vi = "vi",
+                 whichweights = "unif",
+                 num.trees = 3000,
+                 method = "DL")
+predictions_df2 <- data.frame(
+  Adopt_hat = create_predictions("Adopt", mf2),
+  Twin_hat = create_predictions("Twin", mf2),
+  Bio_hat = create_predictions("Bio", mf2)
+) %>%
+  mutate(nature = (Bio_hat - Adopt_hat) / Twin_hat)
+
+nature2_est <- plot_density_with_mean_mode(predictions_df2$nature,"green")
+beta2_est <- plot_density_with_mean_mode(predictions_df2$Twin_hat,"orange")
+```
+
+```{r fig.height=7}
+library(gridExtra)
+grid.arrange(beta_est + labs(title = "A. Intergenerational transmission", x = "", y = ""),
+             nature_est + labs(title = "B. Hertability Contribution", x = "", y = ""),
+             ncol=1)
+             
+
+```
+```{r}
+summary(mf2)
+```
+
+```{r fig.height=7}
+grid.arrange(plot(mf2),VarImpPlot(mf2), ncol=1)
+```
+
+
+```{r fig.height=8}
+library(gridExtra)
+grid.arrange(beta2_est + labs(title = "A. Intergenerational transmission (robustness)", x = "", y = ""),
+             nature2_est + labs(title = "B. Hertability Contribution (robustness)", x = "", y = ""),
+             ncol=1)
+```
+
+
+
