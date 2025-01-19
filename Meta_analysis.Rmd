@@ -38,9 +38,24 @@ for (col in names(df)) {
 
 ```
 
+```{r}
+library(summarytools)
+view(dfSummary(df, 
+               plain.ascii  = FALSE, 
+               style        = "grid", 
+               graph.magnif = 0.75, 
+               graph.col = FALSE,
+               valid.col    = FALSE))
+
+library(xtable)
+
+```
+
+
 ```{r fig.width=11}
 library(metaforest)
-WeightedScatter(df, yi= "Beta", vi ="vi", vars = c("Study_ID"))
+list <- WeightedScatter(df, yi= "Beta", vi ="vi", vars = c("Study_ID"))
+list
 
 ```
 
@@ -56,7 +71,6 @@ mf <- MetaForest(formula = Beta ~ .,
                  method = "DL")
 
 summary(mf)
-
 ```
 
 ```{r eval=FALSE, include=FALSE}
@@ -67,7 +81,8 @@ features <- preselect(mf, replications = 100, algorithm = "recursive")
 ```{r fig.height=7}
 library(gridExtra)
 
-grid.arrange(plot(mf),VarImpPlot(mf), ncol=1)
+meta1 <- grid.arrange(plot(mf),VarImpPlot(mf), ncol=1)
+meta1
 
 ```
 
@@ -141,6 +156,17 @@ outlier <- ggplot(mean_data, aes(x = Study_ID, y = mean_Twin_hat)) +
 outlier
 ```
 
+```{r fig.height=7}
+library(gridExtra)
+results <-grid.arrange(beta_est + labs(title = "A. Intergenerational transmission", x = "", y = ""),
+             nature_est + labs(title = "B. Hertability Contribution", x = "", y = ""),
+             ncol=1)
+             
+print(results)
+```
+
+
+
 Sensitivity analysis
 
 ```{r}
@@ -163,29 +189,33 @@ nature2_est <- plot_density_with_mean_mode(predictions_df2$nature,"green")
 beta2_est <- plot_density_with_mean_mode(predictions_df2$Twin_hat,"orange")
 ```
 
-```{r fig.height=7}
-library(gridExtra)
-grid.arrange(beta_est + labs(title = "A. Intergenerational transmission", x = "", y = ""),
-             nature_est + labs(title = "B. Hertability Contribution", x = "", y = ""),
-             ncol=1)
-             
 
-```
 ```{r}
 summary(mf2)
 ```
 
 ```{r fig.height=7}
-grid.arrange(plot(mf2),VarImpPlot(mf2), ncol=1)
+meta<-grid.arrange(plot(mf2),VarImpPlot(mf2), ncol=1)
+meta
 ```
 
 
 ```{r fig.height=8}
 library(gridExtra)
-grid.arrange(beta2_est + labs(title = "A. Intergenerational transmission (robustness)", x = "", y = ""),
+
+robustness <- grid.arrange(beta2_est + labs(title = "A. Intergenerational transmission (robustness)", x = "", y = ""),
              nature2_est + labs(title = "B. Hertability Contribution (robustness)", x = "", y = ""),
              ncol=1)
+robustness
 ```
 
+```{r}
+ggsave("figs/outlier.svg", plot = outlier)
+ggsave("figs/results.svg", plot = results)
+ggsave("figs/robustness.svg", plot = robustness)
+ggsave("figs/list.svg", plot = list, width=9, height=4)
+ggsave("figs/meta.svg", plot = meta1)
+
+```
 
 

@@ -107,4 +107,6 @@ density_plot <- ggplot(results, aes(x = phi1_sq_hat)) +
   theme_minimal()
 
 # Combine the plots
-beta_plot + density_plot
+simulation <- beta_plot + density_plot
+
+ggsave("figs/simulation.svg", plot = simulation, width=7, height=4)
