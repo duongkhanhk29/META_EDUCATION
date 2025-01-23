@@ -4,6 +4,7 @@ n_families <- 10000  # Number of families
 n_parents <- 2       # twin parents
 beta <- 0.3          # Coefficient for education transmission
 alpha <- 0.2         # Coefficient for social factors
+gamma <- 0.8
 phi3_sq <- 0.3          # Contribution of Unique experiences
 phi2_sq <- 0.2          # Contribution of Common family influence
 phi1_sq <- 1-phi3_sq-phi2_sq # Contribution of Heritability
@@ -34,9 +35,9 @@ for (i in 1:ntime) {
   X <- sqrt(phi1_sq)*H1[family_ids] + sqrt(phi2_sq)*C[family_ids] + sqrt(phi3_sq)*E  # Parent education outcome
   
   Y1 <- beta * (sqrt(phi1_sq)*H1[family_ids] +  sqrt(phi3_sq)*E) +
-                alpha * Z1 + sqrt(phi2_sq)*C[family_ids] + e1  # Biological child outcome
+                alpha * Z1 + gamma*sqrt(phi2_sq)*C[family_ids] + e1  # Biological child outcome
   Y2 <- beta * (sqrt(phi1_sq)*H2 + sqrt(phi3_sq)*E) +
-                alpha * Z2 + sqrt(phi2_sq)*C[family_ids] + e2 # Adopted child outcome
+                alpha * Z2 + gamma*sqrt(phi2_sq)*C[family_ids] + e2 # Adopted child outcome
   
   # OLS model
   biog <- lm(Y1 ~ X + Z1)
@@ -92,8 +93,8 @@ beta_plot <- ggplot(results, aes(x = 1:nrow(results))) +
   geom_ribbon(aes(ymin = beta2_lower, ymax = beta2_upper, fill = "Beta2 CI"), alpha = 0.2) +
   labs(title = "A. Estimates of Beta Over Time", x = "", y = "") + 
   geom_hline(yintercept = beta, color = "black", linetype = "dashed") + 
-  geom_hline(yintercept = beta*phi3_sq + phi2_sq, color = "black", linetype = "dashed") +
-  geom_hline(yintercept = beta*(phi1_sq + phi3_sq) + phi2_sq, color = "black", linetype = "dashed") +
+  geom_hline(yintercept = beta*phi3_sq + gamma*phi2_sq, color = "black", linetype = "dashed") +
+  geom_hline(yintercept = beta*(phi1_sq + phi3_sq) + gamma*phi2_sq, color = "black", linetype = "dashed") +
   theme_minimal()
 
 # Calculate phi1_sq_hat
